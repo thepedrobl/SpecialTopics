@@ -1,0 +1,292 @@
+% Special Topics Phase 2 Assignment
+% 5149436 Pedro Lima, Sun-Mars L3-L1 (0.1 lightness)
+clc
+clear
+constants
+format longEng
+set(0,'defaultAxesFontSize',12);
+set(0, 'DefaultLineLineWidth', 2);
+
+global mu
+mu = m_M/(m_S + m_M);
+beta = 0.1;
+t_ref = sqrt(a_M^3/mu_S);
+
+
+%% Task 1.1a
+L1 = getLagrangePoint('L1',1e-15);
+L2 = getLagrangePoint('L2',1e-15);
+L3 = getLagrangePoint('L3',1e-15);
+[L1 L2 L3]
+
+
+%% Task 1.1b
+aa = mu/(1-mu);
+bb = (aa/3)^(1/3);
+LL = [  1 - mu - (bb - bb^2/3 - bb^3/9 - 23*bb^4/81);
+        1 - mu + (bb + bb^2/3 - bb^3/9 - 31*bb^4/81);
+        - mu - (1 - 7*aa/12 + 7*aa^2/12 - 13223*aa^3/20736)];
+    
+LL - [L1;L2;L3]
+
+
+%% Task 1.2a, 1.2b
+Lshift = 0.005;
+AL1 = L1 - Lshift;
+AL3 = L3 + Lshift;
+
+AL1_perf = getSailPerf([AL1 0 0]);
+AL3_perf = getSailPerf([AL3 0 0]);
+AL1_perf.bb
+AL3_perf.bb
+AL1_perf.dir
+AL3_perf.dir
+
+
+%% Task 1.2c
+cr3bp(0, [AL1 0 0 0 0 0])
+ss_accel([AL1 0 0], AL1_perf.bb, AL1_perf.dir)
+
+cr3bp(0, [AL3 0 0 0 0 0])
+ss_accel([AL3 0 0], AL3_perf.bb, AL3_perf.dir)
+
+
+%% Task 1.2d
+m = 10;
+P = G_SC/c;
+
+AL1_perf.A = AL1_perf.bb*mu_S*m/2/P/AU^2;
+AL1_perf.sl = sqrt(AL1_perf.A)
+AL3_perf.A = AL3_perf.bb*mu_S*m/2/P/AU^2;
+AL3_perf.sl = sqrt(AL3_perf.A)
+
+
+%% Task 2.1a
+Li = L3;
+Lf = L1;
+
+Ai = getJacobian(Li);
+Af = getJacobian(Lf);
+[Vi, Di] = eig(Ai);
+[Vf, Df] = eig(Af);
+Di = diag(Di)
+Df = diag(Df)
+
+
+%% Task 2.1b
+Di_ver = getEigen(Li);
+Df_ver = getEigen(Lf);
+[Di_ver]
+[Df_ver]
+
+
+%% Task 2.2a
+t_prop = 5 * ((AU/a_M)^(3/2)) * (2*pi);
+tspan = [0 t_prop];
+Lp = [L1, L2, L3];
+
+clear mf
+for i = 1:3
+    mf(i,:) = computeManifolds(Lp(i), tspan, 1e-6);
+end
+
+ls = ["-", "-", "-", "-"];
+figure(220)
+for i = 1:2
+    subplot(2,2,i)
+    hold on
+    for j = 1:4
+        plot(mf(i,j).x, mf(i,j).y, ls(j), 'LineWidth', 1.5)
+    end
+    plot(1-mu,0,'or','DisplayName','Mars')
+    plot(L1,0,'xk','DisplayName','L1')
+    plot(L2,0,'sk','DisplayName','L2')
+    axis equal
+    grid on
+    legend("L"+i+"   stable manifold", "L"+i+"   stable manifold", ...
+           "L"+i+" unstable manifold", "L"+i+" unstable manifold", ...
+           "Mars", "L1", "L2");
+    title("L"+i+" manifolds");
+    set(gca,'FontSize',12)
+end
+
+%% Task 2.2b
+t_prop = 500 * ((AU/a_M)^(3/2)) * (2*pi);
+tspan = [0 t_prop];
+Lp = [L1, L2, L3];
+
+clear mf
+for i = [1 3]
+    mf(i,:) = computeManifolds(Lp(i), tspan, 1e-6);
+end
+
+ls = ["-", "-", "-", "-"];
+figure(221)
+clf
+for i = [1 3]
+    hold on
+    for j = 1:4
+        plot(mf(i,j).x, mf(i,j).y, ls(j), 'LineWidth', 1.5)
+    end
+    axis equal
+    grid on
+    legend("L"+i+"   stable manifold", "L"+i+"   stable manifold", ...
+           "L"+i+" unstable manifold", "L"+i+" unstable manifold");
+    title("L"+i+" manifolds");
+    set(gca,'FontSize',12)
+end
+
+
+%% Task 2.3a
+clc
+tspan = [0 t_prop];
+dd = 0;
+aa = deg2rad(-70:2.5:70);
+
+clear mfs
+for i = 1:3
+    for j = 1:length(aa)
+        [i j]
+        mfs(i,j,:) = computeManifolds_ss(Lp(i),tspan,1e-5,beta,aa(j),dd);
+    end
+end
+clc
+
+for i=1:length(aa)
+    currentMatrix = pdist2(mfs(1,i,1).X, mfs(3,i,2).X);
+    [minima(i), k(i)] = min(currentMatrix, [], 'all','linear');
+    if minima(i) <= min(minima)
+        min_ix = i;
+        enErr = minima(i);
+        [row,col] = ind2sub(size(currentMatrix), k(i));
+        mf_st = mfs(1,i,1);
+        mf_un = mfs(3,i,2);
+        epErr = pdist2(mf_st.X(row,1:3), mf_un.X(col,1:3));
+        evErr = pdist2(mf_st.X(row,4:6), mf_un.X(col,4:6));
+        st_tt = mf_st.t(row);
+        un_tt = mf_un.t(col);
+    end
+end
+
+clc
+disp("Best cone angle = " + rad2deg(aa(min_ix)) + " deg")
+disp("Euclidean norm error = " + enErr)
+disp("Position error = " + epErr*a_M/1000 + " km")
+disp("Velocity error = " + evErr*a_M/1000/t_ref + " km/s")
+disp("Unst mf transfer time = " + un_tt*t_ref + " s")
+disp("Stab mf transfer time = " + -st_tt*t_ref + " s")
+%%
+figure(231)
+    clf
+    semilogy(rad2deg(aa), minima)
+    xlabel('Cone Angle \alpha [deg]');
+    ylabel('min||\DeltaX||');
+    set(gca,'FontSize',12)
+%%
+figure(232)
+    clf
+    plot3(mf_st.X(:,1), mf_st.X(:,2), mf_st.X(:,3))
+    hold on
+    plot3(mf_un.X(1:col,1), mf_un.X(1:col,2), mf_un.X(1:col,3))
+    plot3(-mu,0,0,'o','MarkerSize',20,'MarkerFaceColor','#FFAE00')
+    plot3(L1,0,0,'xk','MarkerSize',10)
+    plot3(L3,0,0,'sk','MarkerSize',10)
+    % projections
+    projections(mf_st, mf_un)
+    axis equal
+    grid on
+    view(az,el)
+    xlabel('x')
+    ylabel('y')
+    zlabel('z')
+    legend("L1 stable manifold", "L3 unstable manifold", "Sun", "L3", "L3")
+    title("\alpha = 7.5 deg transfer");
+    set(gca,'FontSize',12)
+
+
+%% Save results
+clear currentMatrix trainingData
+aa = deg2rad(-70:2.5:70);
+actualTrainingData = []
+step = 10;
+tic
+for i=1:length(aa)
+    currentMatrix = pdist2(mfs(1,i,1).X(1:step:end,:), mfs(3,i,2).X(1:step:end,:));
+    t = vectorOfTimes(mfs(3,i,2).t(1:step:end), -mfs(1,i,1).t(1:step:end));
+    trainingData = [aa(i)*ones(size(t,1),1), t, reshape(currentMatrix,[],1)];
+    actualTrainingData = [actualTrainingData; trainingData];
+    [i toc]
+end
+    save("C:\savefiles\mfTraining.dat", 'actualTrainingData', '-ascii', '-double', '-tabs');
+
+
+%%
+
+
+xVerif = linspace(-1.5, 1.5,2000);
+yVerif = linspace(-1.5, 1.5,2000);
+zVerif = linspace(-1.5, 1.5,2000);
+[Xxz,Zxz] = meshgrid(xVerif, zVerif);
+[X,Y] = meshgrid(xVerif, yVerif);
+
+for i=1:length(xVerif)
+    for j=1:length(zVerif)
+        r1Verif = [xVerif(i) + mu, 0, zVerif(j)];
+        XZ(j,i) = dot(r1Verif, gradU([xVerif(i),0,zVerif(j)]));
+    end
+        [i j]
+end
+
+for i=1:length(xVerif)
+    for j=1:length(yVerif)
+        r1Verif = [xVerif(i) + mu, yVerif(j), 0 ];
+        XY(j,i) = dot(r1Verif, gradU([xVerif(i),yVerif(j),0]));
+    end
+        [i j]
+end
+
+figure
+subplot(131)
+axis equal
+hold on
+contour(Xxz, Zxz, XZ, 'HandleVisibility', 'off')
+scatter(-mu,  0, 200, 'or', 'filled', 'DisplayName', 'Sun', 'MarkerEdgeColor', 'black')
+scatter(1-mu, 0, 100, 'ob', 'filled', 'DisplayName', 'Earth', 'MarkerEdgeColor', 'green')
+scatter(L2, 0, 100, 'Xk', 'DisplayName', 'Lagrange Points', 'LineWidth', 2)
+scatter(L3, 0, 100, 'Xk', 'LineWidth', 2, 'HandleVisibility', 'off')
+xlabel('x')
+ylabel('z')
+legend()
+
+subplot(132)
+axis equal
+hold on
+contour(Xxz, Zxz, XZ, 'HandleVisibility', 'off')
+scatter(1-mu, 0, 100, 'ob', 'filled', 'DisplayName', 'Earth', 'MarkerEdgeColor', 'green')
+scatter(L2, 0, 100, 'Xk', 'DisplayName', 'Lagrange Points', 'LineWidth', 2)
+xlabel('x')
+ylabel('z')
+
+
+subplot(133)
+axis equal
+hold on
+contour(X, Y, XY, 'HandleVisibility', 'off')
+scatter(-mu,  0, 200, 'or', 'filled', 'DisplayName', 'Sun', 'MarkerEdgeColor', 'black')
+scatter(1-mu, 0, 100, 'ob', 'filled', 'DisplayName', 'Earth', 'MarkerEdgeColor', 'green')
+scatter(L2, 0, 100, 'Xk', 'DisplayName', 'Lagrange Points', 'LineWidth', 2)
+scatter(L3, 0, 100, 'Xk', 'LineWidth', 2, 'HandleVisibility', 'off')
+xlabel('x')
+ylabel('y')
+
+
+
+
+
+
+
+
+
+
+
+
